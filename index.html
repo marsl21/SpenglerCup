@@ -608,7 +608,7 @@
 
         <div class="fact">
           <span>Kosten</span>
-          <strong>ca. CHF 80.–</strong>
+          <strong>CHF 80.–</strong>
         </div>
 
         <div class="fact">
@@ -642,7 +642,7 @@
 
         <p class="payment-note">
           <strong>Wichtig:</strong><br>
-          Der Betrag von ca. CHF 80.– muss bis spätestens 20.11.2026 bezahlt werden.
+          Der Betrag von CHF 80.– muss bis spätestens 20.11.2026 bezahlt werden.
         </p>
       </article>
 
@@ -693,7 +693,7 @@
           <label class="checkbox">
             <input id="bezahlt" name="bezahlt" type="checkbox" required>
             <span>
-              Ich bestätige, dass ich den Betrag von ca. CHF 80.–
+              Ich bestätige, dass ich den Betrag von CHF 80.–
               bis spät. 20. November bezahle.
             </span>
           </label>
@@ -826,6 +826,38 @@
       copyText(twintReference.textContent, this, "Vermerk kopieren");
     });
 
+    async function registrationExists(id) {
+      try {
+        const response = await fetch(
+          `${SCRIPT_URL}?check=${encodeURIComponent(id)}&t=${Date.now()}`,
+          { method: "GET", cache: "no-store" }
+        );
+
+        if (!response.ok) return false;
+
+        const data = await response.json();
+        return data.found === true;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    async function waitForRegistration(id, maxSeconds = 25) {
+      for (let i = 0; i < maxSeconds; i++) {
+        if (await registrationExists(id)) return true;
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+      return false;
+    }
+
+    function createRegistrationId() {
+      if (window.crypto && typeof window.crypto.randomUUID === "function") {
+        return window.crypto.randomUUID();
+      }
+
+      return "reg-" + Date.now() + "-" + Math.random().toString(36).slice(2, 10);
+    }
+
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
 
@@ -836,54 +868,54 @@
 
       submitButton.disabled = true;
       submitButton.classList.remove("submit-success");
-      submitButton.innerHTML = '<span class="submit-loading"><span class="spinner" aria-hidden="true"></span><span>Anmeldung wird gespeichert …</span></span>';
+      submitButton.innerHTML =
+        '<span class="submit-loading"><span class="spinner" aria-hidden="true"></span><span>Anmeldung wird gespeichert …</span></span>';
+
       savingHint.textContent = "Bitte diese Seite noch kurz offen lassen.";
       savingHint.classList.add("show");
       message.className = "message";
       twintBox.classList.remove("show");
 
-      const slowTimer = setTimeout(() => {
-        savingHint.textContent = "Google braucht gerade etwas länger – deine Anmeldung wird weiterhin verarbeitet.";
-      }, 3500);
-
       const payload = {
+        id: createRegistrationId(),
         vorname: document.getElementById("vorname").value.trim(),
         name: document.getElementById("name").value.trim(),
         team: document.getElementById("team").value.trim(),
         bezahlt: document.getElementById("bezahlt").checked
       };
 
-      try {
-        const response = await fetch(SCRIPT_URL, {
-          method: "POST",
-          headers: {
-            "Content-Type": "text/plain;charset=utf-8"
-          },
-          body: JSON.stringify(payload)
-        });
+      const anmeldungsName = `${payload.vorname} ${payload.name}`.trim();
 
-        if (!response.ok) {
-          throw new Error("Die Anmeldung konnte nicht gespeichert werden.");
-        }
+      // Wichtig:
+      // Wir warten NICHT mehr auf die POST-Antwort von Google.
+      // Apps Script kann die Zeile bereits gespeichert haben, obwohl die
+      // Antwort zum Browser sehr lange braucht oder dort sogar fehlschlägt.
+      fetch(SCRIPT_URL, {
+        method: "POST",
+        mode: "no-cors",
+        headers: {
+          "Content-Type": "text/plain;charset=utf-8"
+        },
+        body: JSON.stringify(payload)
+      }).catch(() => {
+        // Absichtlich leer: Der Erfolg wird unten separat per GET geprüft.
+      });
 
-        const result = await response.json();
+      const slowTimer = setTimeout(() => {
+        savingHint.textContent =
+          "Die Anmeldung wird noch geprüft – bitte diese Seite kurz offen lassen.";
+      }, 3500);
 
-        if (!result.success) {
-          throw new Error(
-            result.message === "Ausgebucht"
-              ? "Leider sind bereits alle 50 Plätze vergeben."
-              : "Die Anmeldung konnte nicht gespeichert werden."
-          );
-        }
+      const confirmed = await waitForRegistration(payload.id, 25);
+      clearTimeout(slowTimer);
 
-        clearTimeout(slowTimer);
-        const anmeldungsName = `${payload.vorname} ${payload.name}`.trim();
-
+      if (confirmed) {
         submitButton.classList.add("submit-success");
         submitButton.innerHTML = "✓ Anmeldung gespeichert";
         savingHint.classList.remove("show");
 
         form.reset();
+
         showMessage(
           "🎉 Deine Anmeldung wurde erfolgreich gespeichert. Wir freuen uns auf Davos!",
           "success"
@@ -899,19 +931,59 @@
         }, 250);
 
         loadAvailability();
-      } catch (error) {
-        clearTimeout(slowTimer);
-        savingHint.classList.remove("show");
-
-        showMessage(
-          error.message || "Es ist ein Fehler aufgetreten. Bitte versuche es nochmals.",
-          "error"
-        );
-
-        submitButton.disabled = false;
-        submitButton.classList.remove("submit-success");
-        submitButton.textContent = "Verbindlich anmelden";
+        return;
       }
+
+      // Keine falsche Fehlermeldung mehr:
+      // Falls Google die Kontrollabfrage nicht rechtzeitig beantwortet,
+      // sagen wir nicht, dass die Anmeldung fehlgeschlagen sei.
+      submitButton.disabled = false;
+      submitButton.classList.remove("submit-success");
+      submitButton.textContent = "Status nochmals prüfen";
+
+      savingHint.textContent =
+        "Die Übermittlung wurde gesendet, aber Google bestätigt sie gerade nicht zuverlässig. Bitte nicht nochmals neu anmelden.";
+      savingHint.classList.add("show");
+
+      showMessage(
+        "Deine Anmeldung wurde übermittelt. Bitte prüfe kurz, ob die Teilnehmerzahl links gestiegen ist. Im Zweifel nicht nochmals absenden.",
+        "error"
+      );
+
+      submitButton.onclick = async function (e) {
+        e.preventDefault();
+        submitButton.disabled = true;
+        submitButton.innerHTML =
+          '<span class="submit-loading"><span class="spinner" aria-hidden="true"></span><span>Status wird geprüft …</span></span>';
+
+        const found = await waitForRegistration(payload.id, 15);
+
+        if (found) {
+          submitButton.classList.add("submit-success");
+          submitButton.innerHTML = "✓ Anmeldung gespeichert";
+          savingHint.classList.remove("show");
+
+          form.reset();
+          showMessage(
+            "🎉 Deine Anmeldung wurde erfolgreich gespeichert. Wir freuen uns auf Davos!",
+            "success"
+          );
+
+          twintRecipient.textContent = TWINT_NAME;
+          twintPhone.textContent = TWINT_PHONE;
+          twintReference.textContent = `Spengler Cup – ${anmeldungsName}`;
+          twintBox.classList.add("show");
+
+          setTimeout(() => {
+            twintBox.scrollIntoView({ behavior: "smooth", block: "start" });
+          }, 250);
+
+          loadAvailability();
+        } else {
+          submitButton.disabled = false;
+          submitButton.textContent = "Status nochmals prüfen";
+        }
+      };
     });
 
     loadAvailability();
