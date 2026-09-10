@@ -903,7 +903,7 @@
 
       const slowTimer = setTimeout(() => {
         savingHint.textContent =
-          "Die Anmeldung wird noch geprüft – bitte diese Seite kurz offen lassen.";
+          "Es kann manchmal einige Sekunden dauern, bitte Fenster offen lassen! Geduld.. Geduld... Geduld....";
       }, 3500);
 
       const confirmed = await waitForRegistration(payload.id, 25);
