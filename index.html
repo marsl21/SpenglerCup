@@ -355,6 +355,91 @@
       color: #ffc3c7;
     }
 
+
+    .twint-box {
+      display: none;
+      margin-top: 18px;
+      padding: 18px;
+      border: 1px solid rgba(255,255,255,.18);
+      border-radius: 18px;
+      background: rgba(255,255,255,.07);
+      text-align: center;
+    }
+
+    .twint-box.show {
+      display: block;
+      animation: twintIn .35s ease-out;
+    }
+
+    .twint-box h3 {
+      margin: 0 0 8px;
+      font-size: 22px;
+    }
+
+    .twint-box p {
+      margin: 7px 0;
+      color: var(--ice);
+      line-height: 1.45;
+    }
+
+    .twint-amount {
+      margin: 14px 0 10px;
+      color: var(--yellow);
+      font-size: 34px;
+      font-weight: 900;
+      letter-spacing: -.03em;
+    }
+
+    .twint-data {
+      margin: 14px 0;
+      padding: 14px;
+      border-radius: 14px;
+      background: rgba(1,12,23,.48);
+      text-align: left;
+    }
+
+    .twint-data small {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--muted);
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+
+    .twint-data strong {
+      display: block;
+      font-size: 18px;
+      overflow-wrap: anywhere;
+    }
+
+    .copy-btn {
+      margin-top: 9px;
+      padding: 11px 13px;
+      border-radius: 12px;
+      background: rgba(255,255,255,.11);
+      color: var(--white);
+      box-shadow: none;
+      font-size: 14px;
+    }
+
+    .copy-btn:hover:not(:disabled) {
+      transform: none;
+      box-shadow: none;
+      background: rgba(255,255,255,.16);
+    }
+
+    .twint-note {
+      margin-top: 12px !important;
+      color: var(--muted) !important;
+      font-size: 13px;
+    }
+
+    @keyframes twintIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
     footer {
       padding: 28px 10px 0;
       color: #7890a6;
@@ -482,7 +567,7 @@
 
         <div class="fact">
           <span>Kosten</span>
-          <strong>ca. CHF 70.–</strong>
+          <strong>CHF 80.–</strong>
         </div>
 
         <div class="fact">
@@ -516,7 +601,7 @@
 
         <p class="payment-note">
           <strong>Wichtig:</strong><br>
-          Der Betrag von ca. CHF 70.– muss bis Ende Oktober 2026 bezahlt werden.
+          Der Betrag von ca. CHF 80.– muss bis spätestens 20.11.2026 bezahlt werden.
         </p>
       </article>
 
@@ -567,13 +652,42 @@
           <label class="checkbox">
             <input id="bezahlt" name="bezahlt" type="checkbox" required>
             <span>
-              Ich bestätige, dass ich den Betrag von ca. CHF 70.–
-              bis Ende Oktober 2026 bezahle.
+              Ich bestätige, dass ich den Betrag von ca. CHF 80.–
+              bis spät. 20. November bezahle.
             </span>
           </label>
 
           <button id="submitButton" type="submit">Verbindlich anmelden</button>
           <div id="message" class="message" role="status" aria-live="polite"></div>
+
+          <div id="twintBox" class="twint-box">
+            <h3>✅ Anmeldung gespeichert</h3>
+            <p>Jetzt kannst du den Betrag direkt per TWINT überweisen:</p>
+
+            <div class="twint-amount">CHF 80.–</div>
+
+            <div class="twint-data">
+              <small>TWINT an</small>
+              <strong id="twintRecipient">DEIN NAME</strong>
+            </div>
+
+            <div class="twint-data">
+              <small>Telefonnummer</small>
+              <strong id="twintPhone">07X XXX XX XX</strong>
+              <button type="button" class="copy-btn" id="copyPhone">Telefonnummer kopieren</button>
+            </div>
+
+            <div class="twint-data">
+              <small>Mitteilung / Vermerk</small>
+              <strong id="twintReference">Spengler Cup</strong>
+              <button type="button" class="copy-btn" id="copyReference">Vermerk kopieren</button>
+            </div>
+
+            <p class="twint-note">
+              Bitte den Betrag bis spätestens 20.11.2026 bezahlen.
+            </p>
+          </div>
+
         </form>
       </article>
     </section>
@@ -595,6 +709,14 @@
     const freePlaces = document.getElementById("freePlaces");
     const registeredText = document.getElementById("registeredText");
     const progressBar = document.getElementById("progressBar");
+    const twintBox = document.getElementById("twintBox");
+    const twintRecipient = document.getElementById("twintRecipient");
+    const twintPhone = document.getElementById("twintPhone");
+    const twintReference = document.getElementById("twintReference");
+
+    // Diese zwei Werte ersetze ich dir noch mit deinen echten TWINT-Daten:
+    const TWINT_NAME = "DEIN NAME";
+    const TWINT_PHONE = "07X XXX XX XX";
 
     function showMessage(text, type) {
       message.textContent = text;
@@ -639,6 +761,26 @@
       }
     }
 
+
+    async function copyText(text, button, originalLabel) {
+      try {
+        await navigator.clipboard.writeText(text);
+        button.textContent = "Kopiert ✓";
+        setTimeout(() => button.textContent = originalLabel, 1400);
+      } catch (e) {
+        button.textContent = "Bitte manuell kopieren";
+        setTimeout(() => button.textContent = originalLabel, 1800);
+      }
+    }
+
+    document.getElementById("copyPhone").addEventListener("click", function () {
+      copyText(TWINT_PHONE, this, "Telefonnummer kopieren");
+    });
+
+    document.getElementById("copyReference").addEventListener("click", function () {
+      copyText(twintReference.textContent, this, "Vermerk kopieren");
+    });
+
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
 
@@ -650,6 +792,7 @@
       submitButton.disabled = true;
       submitButton.textContent = "Anmeldung wird gespeichert …";
       message.className = "message";
+      twintBox.classList.remove("show");
 
       const payload = {
         vorname: document.getElementById("vorname").value.trim(),
@@ -681,11 +824,22 @@
           );
         }
 
+        const anmeldungsName = `${payload.vorname} ${payload.name}`.trim();
+
         form.reset();
         showMessage(
           "🎉 Deine Anmeldung wurde erfolgreich gespeichert. Wir freuen uns auf Davos!",
           "success"
         );
+
+        twintRecipient.textContent = TWINT_NAME;
+        twintPhone.textContent = TWINT_PHONE;
+        twintReference.textContent = `Spengler Cup – ${anmeldungsName}`;
+        twintBox.classList.add("show");
+
+        setTimeout(() => {
+          twintBox.scrollIntoView({ behavior: "smooth", block: "center" });
+        }, 150);
 
         await loadAvailability();
       } catch (error) {
