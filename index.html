@@ -332,6 +332,47 @@
       opacity: .55;
     }
 
+
+    .submit-loading {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .spinner {
+      width: 19px;
+      height: 19px;
+      flex: 0 0 auto;
+      border: 3px solid rgba(20,32,50,.25);
+      border-top-color: #142032;
+      border-radius: 50%;
+      animation: spin .75s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .saving-hint {
+      display: none;
+      margin-top: 11px;
+      color: var(--muted);
+      text-align: center;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .saving-hint.show {
+      display: block;
+    }
+
+    .submit-success {
+      background: var(--green) !important;
+      color: #042417 !important;
+      box-shadow: 0 14px 30px rgba(38,194,129,.2) !important;
+    }
+
     .message {
       display: none;
       margin-top: 17px;
@@ -567,7 +608,7 @@
 
         <div class="fact">
           <span>Kosten</span>
-          <strong>CHF 80.–</strong>
+          <strong>ca. CHF 80.–</strong>
         </div>
 
         <div class="fact">
@@ -658,6 +699,9 @@
           </label>
 
           <button id="submitButton" type="submit">Verbindlich anmelden</button>
+          <div id="savingHint" class="saving-hint" aria-live="polite">
+            Bitte diese Seite noch kurz offen lassen.
+          </div>
           <div id="message" class="message" role="status" aria-live="polite"></div>
 
           <div id="twintBox" class="twint-box">
@@ -706,6 +750,7 @@
     const form = document.getElementById("registrationForm");
     const submitButton = document.getElementById("submitButton");
     const message = document.getElementById("message");
+    const savingHint = document.getElementById("savingHint");
     const freePlaces = document.getElementById("freePlaces");
     const registeredText = document.getElementById("registeredText");
     const progressBar = document.getElementById("progressBar");
@@ -790,9 +835,16 @@
       }
 
       submitButton.disabled = true;
-      submitButton.textContent = "Anmeldung wird gespeichert …";
+      submitButton.classList.remove("submit-success");
+      submitButton.innerHTML = '<span class="submit-loading"><span class="spinner" aria-hidden="true"></span><span>Anmeldung wird gespeichert …</span></span>';
+      savingHint.textContent = "Bitte diese Seite noch kurz offen lassen.";
+      savingHint.classList.add("show");
       message.className = "message";
       twintBox.classList.remove("show");
+
+      const slowTimer = setTimeout(() => {
+        savingHint.textContent = "Google braucht gerade etwas länger – deine Anmeldung wird weiterhin verarbeitet.";
+      }, 3500);
 
       const payload = {
         vorname: document.getElementById("vorname").value.trim(),
@@ -824,7 +876,12 @@
           );
         }
 
+        clearTimeout(slowTimer);
         const anmeldungsName = `${payload.vorname} ${payload.name}`.trim();
+
+        submitButton.classList.add("submit-success");
+        submitButton.innerHTML = "✓ Anmeldung gespeichert";
+        savingHint.classList.remove("show");
 
         form.reset();
         showMessage(
@@ -838,17 +895,21 @@
         twintBox.classList.add("show");
 
         setTimeout(() => {
-          twintBox.scrollIntoView({ behavior: "smooth", block: "center" });
-        }, 150);
+          twintBox.scrollIntoView({ behavior: "smooth", block: "start" });
+        }, 250);
 
-        await loadAvailability();
+        loadAvailability();
       } catch (error) {
+        clearTimeout(slowTimer);
+        savingHint.classList.remove("show");
+
         showMessage(
           error.message || "Es ist ein Fehler aufgetreten. Bitte versuche es nochmals.",
           "error"
         );
 
         submitButton.disabled = false;
+        submitButton.classList.remove("submit-success");
         submitButton.textContent = "Verbindlich anmelden";
       }
     });
